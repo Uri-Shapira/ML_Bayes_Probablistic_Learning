@@ -27,6 +27,9 @@ def get_prior(dataset, class_value):
             count += 1
     return count / length
 
+def get_instance_posterior(prior, likelihood):
+    return prior * likelihood
+
 class NaiveNormalClassDistribution():
 
     def __init__(self, dataset, class_value):
@@ -73,9 +76,8 @@ class NaiveNormalClassDistribution():
         Returns the posterior porbability of the instance under the class according to the dataset distribution.
         * Ignoring p(x)
         """
-        likelihood = self.get_instance_likelihood(x)
-        prior = self.get_prior()
-        return prior * likelihood
+        return get_instance_posterior(self.get_prior(), self.get_instance_likelihood(x))
+
     
 class MultiNormalClassDistribution():
     def __init__(self, dataset, class_value):
@@ -115,9 +117,7 @@ class MultiNormalClassDistribution():
         Returns the posterior porbability of the instance under the class according to the dataset distribution.
         * Ignoring p(x)
         """
-        likelihood = self.get_instance_likelihood(x)
-        prior = self.get_prior()
-        return prior * likelihood
+        return get_instance_posterior(self.get_prior(), self.get_instance_likelihood(x))
        
 def normal_pdf(x, mean, std):
     """
@@ -173,26 +173,39 @@ class DiscreteNBClassDistribution():
         - dataset: The dataset from which to compute the probabilites (Numpy Array).
         - class_value : Compute the relevant parameters only for instances from the given class.
         """
-        pass
-    
+        self.dataset = dataset
+        self.class_value = class_value
+        self.class_value_dataset = split_dataset(dataset, class_value)
+      
     def get_prior(self):
         """
         Returns the prior porbability of the class according to the dataset distribution.
         """
-        return 1
+        return get_prior(self.dataset, self.class_value)
+    
     
     def get_instance_likelihood(self, x):
         """
         Returns the likelihhod porbability of the instance under the class according to the dataset distribution.
         """
-        return 1
+        likelihood = 1
+        for i in range(0,1):
+            size_vj = len(np.unique(self.dataset[:,i])) 
+            n_i_j = np.sum(self.class_value_dataset[:,i] == x[i])
+            n_i = len(self.class_value_dataset)
+            if n_i_j == 0:
+                likelihood *= EPSILLON
+            else: 
+                likelihood *= (n_i_j + 1) / (n_i + size_vj)
+        return likelihood
     
     def get_instance_posterior(self, x):
         """
         Returns the posterior porbability of the instance under the class according to the dataset distribution.
         * Ignoring p(x)
         """
-        return 1
+        return get_instance_posterior(self.get_prior(), self.get_instance_likelihood(x))
+
 
     
 ####################################################################################################
