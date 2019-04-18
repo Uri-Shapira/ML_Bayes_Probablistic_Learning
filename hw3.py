@@ -4,8 +4,31 @@ np.random.seed(42)
 ####################################################################################################
 #                                            Part A
 ####################################################################################################
+def split_dataset(dataset, class_value):
+    class_value_dataset = []
+    for row in dataset:
+        if row[-1] == class_value:
+            class_value_dataset.append(row)
+    return np.asarray(class_value_dataset)   
+
+def get_mu_vector(class_value_dataset):
+    mean_vector = []
+    temperature_mean = np.mean(class_value_dataset[:,0])
+    humidity_mean = np.mean(class_value_dataset[:,1])
+    mean_vector.append(temperature_mean)
+    mean_vector.append(humidity_mean)
+    return mean_vector
+
+def get_prior(dataset, class_value):
+    count = 0
+    length = len(dataset)
+    for row in dataset:
+        if row[-1] == class_value:
+            count += 1
+    return count / length
 
 class NaiveNormalClassDistribution():
+
     def __init__(self, dataset, class_value):
         """
         A class which encapsulate the relevant parameters(mean, std) for a class conditinoal normal distribution.
@@ -15,26 +38,44 @@ class NaiveNormalClassDistribution():
         - dataset: The dataset from which to compute the mean and mu (Numpy Array).
         - class_value : The class to calculate the mean and mu for.
         """
-        pass
+        self.dataset = dataset
+        self.class_value = class_value
+        self.class_value_dataset = split_dataset(dataset, class_value)
+        self.mu_vector = get_mu_vector(self.class_value_dataset)
+        self.sigma_vector = self.get_sigma_vector()
+                                                                                             
+    def get_sigma_vector(self):
+        sigma_vector = []
+        temperature_sigma = np.std(self.class_value_dataset[:,0])
+        humidity_sigma = np.std(self.class_value_dataset[:,1])
+        sigma_vector.append(temperature_sigma)
+        sigma_vector.append(humidity_sigma)
+        return sigma_vector
     
     def get_prior(self):
         """
         Returns the prior porbability of the class according to the dataset distribution.
         """
-        return 1
+        return get_prior(self.dataset, self.class_value)
     
     def get_instance_likelihood(self, x):
         """
         Returns the likelihhod porbability of the instance under the class according to the dataset distribution.
         """
-        return 1
+        instance_likelihood = 1
+        for i in range(2):
+            likelihood = normal_pdf(x[i], self.mu_vector[i], self.sigma_vector[i])
+            instance_likelihood *= likelihood
+        return instance_likelihood
     
     def get_instance_posterior(self, x):
         """
         Returns the posterior porbability of the instance under the class according to the dataset distribution.
         * Ignoring p(x)
         """
-        return 1
+        likelihood = self.get_instance_likelihood(x)
+        prior = self.get_prior()
+        return prior * likelihood
     
 class MultiNormalClassDistribution():
     def __init__(self, dataset, class_value):
@@ -46,31 +87,41 @@ class MultiNormalClassDistribution():
         - dataset: The dataset from which to compute the mean and mu (Numpy Array).
         - class_value : The class to calculate the mean and mu for.
         """
+        self.dataset = dataset
+        self.class_value = class_value
+        self.class_value_dataset = split_dataset(dataset, class_value)
+        self.mu_vector = get_mu_vector(self.class_value_dataset)
+        self.cov = self.get_cov_matrix()
         
     def get_prior(self):
         """
         Returns the prior porbability of the class according to the dataset distribution.
         """
-        return 1
+        return get_prior(self.dataset, self.class_value)
+    
+    def get_cov_matrix(self):
+        transposed_matrix = (np.transpose(np.delete(self.class_value_dataset, 2, 1)))
+        return np.cov(transposed_matrix)
     
     def get_instance_likelihood(self, x):
         """
         Returns the likelihhod porbability of the instance under the class according to the dataset distribution.
         """
-        return 1
+        likelihood = multi_normal_pdf(x, self.mu_vector, self.cov)
+        return likelihood  
     
     def get_instance_posterior(self, x):
         """
         Returns the posterior porbability of the instance under the class according to the dataset distribution.
         * Ignoring p(x)
         """
-        return 1
-    
-    
-
+        likelihood = self.get_instance_likelihood(x)
+        prior = self.get_prior()
+        return prior * likelihood
+       
 def normal_pdf(x, mean, std):
     """
-    Calculate normal desnity function for a given x, mean and standrad deviation.
+    Calculate normal density function for a given x, mean and standrad deviation.
  
     Input:
     - x: A value we want to compute the distribution for.
@@ -79,11 +130,16 @@ def normal_pdf(x, mean, std):
  
     Returns the normal distribution pdf according to the given mean and var for the given x.    
     """
-     pass
+    denominator = np.sqrt(2 * np.pi * np.square(std))
+    first_part = 1 / denominator
+    exponent = -(np.square(x - mean)) / (2*np.square(std))
+    second_part = np.exp(exponent)
+    normal_pdf = first_part * second_part
+    return normal_pdf
     
 def multi_normal_pdf(x, mean, cov):
     """
-    Calculate multi variante normal desnity function for a given x, mean and covarince matrix.
+    Calculate multi variante normal density function for a given x, mean and covarince matrix.
  
     Input:
     - x: A value we want to compute the distribution for.
@@ -92,7 +148,13 @@ def multi_normal_pdf(x, mean, cov):
  
     Returns the normal distribution pdf according to the given mean and var for the given x.    
     """
-    pass
+    x = np.delete(x,2)
+    first_part = np.power(np.square(2*np.pi)*np.square(np.linalg.det(cov)), -1/2)
+    matrix_mult1 = np.matmul(np.transpose(x - mean) , np.linalg.inv(cov))
+    matrix_mult2 = np.matmul(matrix_mult1, x - mean)
+    exponent = (-1/2) * matrix_mult2
+    multi_normal_pdf = first_part * np.exp(exponent)
+    return multi_normal_pdf
 
 
 ####################################################################################################
@@ -147,7 +209,8 @@ class MAPClassifier():
             - ccd0 : An object contating the relevant parameters and methods for the distribution of class 0.
             - ccd1 : An object contating the relevant parameters and methods for the distribution of class 1.
         """
-        pass
+        self.ccd0 = ccd0
+        self.ccd1 = ccd1
     
     def predict(self, x):
         """
@@ -159,7 +222,10 @@ class MAPClassifier():
         Output
             - 0 if the posterior probability of class 0 is higher 1 otherwise.
         """
-        pass
+        if self.ccd0.get_instance_posterior(x) > self.ccd1.get_instance_posterior(x): 
+            return 0
+        else:
+            return 1
     
 def compute_accuracy(testset, map_classifier):
     """
@@ -172,15 +238,8 @@ def compute_accuracy(testset, map_classifier):
     Ouput
         - Accuracy = #Correctly Classified / #testset size
     """
-    return 0
-    
-            
-            
-            
-            
-            
-            
-            
-            
-            
-    
+    correct_predictions = 0
+    for row in testset:
+        if map_classifier.predict(row) == row[-1]:
+            correct_predictions +=1
+    return correct_predictions / len(testset)        
