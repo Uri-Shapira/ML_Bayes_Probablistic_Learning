@@ -44,7 +44,7 @@ class NaiveNormalClassDistribution():
         self.dataset = dataset
         self.class_value = class_value
         self.class_value_dataset = split_dataset(dataset, class_value)
-        self.mu_vector = get_mu_vector(self.class_value_dataset)
+        self.mu_vector = np.average(self.dataset, axis=0)
         self.sigma_vector = self.get_sigma_vector()
                                                                                              
     def get_sigma_vector(self):
@@ -189,7 +189,7 @@ class DiscreteNBClassDistribution():
         Returns the likelihhod porbability of the instance under the class according to the dataset distribution.
         """
         likelihood = 1
-        for i in range(0,1):
+        for i in range(0,8):
             size_vj = len(np.unique(self.dataset[:,i])) 
             n_i_j = np.sum(self.class_value_dataset[:,i] == x[i])
             n_i = len(self.class_value_dataset)
